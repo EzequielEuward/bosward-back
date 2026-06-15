@@ -1,20 +1,18 @@
-version: '3.8'
-
 services:
   db:
-    image: mysql:8.0
-    container_name: ward_mysql
+    image: postgres:16
+    container_name: ward_postgres
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: secret
-      MYSQL_DATABASE: ward_perfumes
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: ward_perfumes
     ports:
-      - '3306:3306'
+      - '5432:5432'
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
+      - pg_data:/var/lib/postgresql/data
 
-  # Opcional: interfaz web para administrar la BD
+  # Opcional: interfaz web para administrar la BD (http://localhost:8080)
   adminer:
     image: adminer
     container_name: ward_adminer
@@ -25,4 +23,4 @@ services:
       - db
 
 volumes:
-  mysql_data:
+  pg_data:

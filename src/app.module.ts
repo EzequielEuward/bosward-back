@@ -26,23 +26,42 @@ import { MediaModule } from './modules/media/media.module';
 
 @Module({
   imports: [
-    // Variables de entorno disponibles globalmente
-    ConfigModule.forRoot({ isGlobal: true }),
+    // Variables de entorno disponibles globalmente.
+    // Carga .env.<NODE_ENV> (ej: .env.production) y luego .env como fallback.
+    // En Render/Netlify las variables reales del entorno tienen prioridad sobre los archivos.
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
+    }),
 
     // Configuración de TypeORM desde variables de entorno
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'mysql',
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 3306),
-        username: config.get<string>('DB_USERNAME', 'root'),
-        password: config.get<string>('DB_PASSWORD', ''),
-        database: config.get<string>('DB_DATABASE', 'ward_perfumes'),
-        entities: [User, Perfume, Order, OrderItem, StockMovement, Payment, Customer, WishlistItem],
-        synchronize: config.get<boolean>('DB_SYNC', true), // Solo en desarrollo
-        logging: config.get<string>('NODE_ENV') !== 'production',
-      }),
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        const useSsl = config.get<string>('DB_SSL') === 'true';
+        // synchronize solo se apaga si DB_SYNC === 'false' (las envs son strings)
+        const synchronize = config.get<string>('DB_SYNC') !== 'false';
+
+        return {
+          type: 'postgres',
+          // Render entrega un connection string (DATABASE_URL).
+          // Si no existe, caemos a las variables sueltas (desarrollo local).
+          ...(databaseUrl
+            ? { url: databaseUrl }
+            : {
+                host: config.get<string>('DB_HOST', 'localhost'),
+                port: config.get<number>('DB_PORT', 5432),
+                username: config.get<string>('DB_USERNAME', 'postgres'),
+                password: config.get<string>('DB_PASSWORD', ''),
+                database: config.get<string>('DB_DATABASE', 'ward_perfumes'),
+              }),
+          ssl: useSsl ? { rejectUnauthorized: false } : false,
+          entities: [User, Perfume, Order, OrderItem, StockMovement, Payment, Customer, WishlistItem],
+          synchronize,
+          logging: config.get<string>('NODE_ENV') !== 'production',
+        };
+      },
     }),
 
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
